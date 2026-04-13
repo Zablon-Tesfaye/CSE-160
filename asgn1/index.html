@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASG1 Paint Program</title>
+
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 20px;
+      background: #f3f3f3;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-top: 0;
+    }
+
+    #webgl {
+      border: 2px solid black;
+      display: block;
+      margin-bottom: 16px;
+      background: black;
+    }
+
+    .panel {
+      background: white;
+      padding: 15px;
+      width: 530px;
+      border-radius: 8px;
+    }
+
+    .group {
+      margin-bottom: 16px;
+    }
+
+    button {
+      margin: 4px 5px 4px 0;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .line {
+      margin: 8px 0;
+    }
+
+    label {
+      display: inline-block;
+      width: 130px;
+    }
+
+    .note {
+      font-size: 14px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+  <h1>Assignment 1 Paint Program</h1>
+  <p class="note">
+    Creative feature: includes a button that draws a triangle-made campsite scene.
+  </p>
+
+  <canvas id="webgl" width="400" height="400"></canvas>
+
+  <div class="panel">
+
+    <div class="group">
+      <strong>Canvas Actions</strong><br>
+      <button id="clearBtn">Clear Canvas</button>
+      <button id="sceneBtn">Draw Scene</button>
+    </div>
+
+    <div class="group">
+      <strong>Draw Mode</strong><br>
+      <button id="pointBtn">Points</button>
+      <button id="triBtn">Triangles</button>
+      <button id="circleBtn">Circles</button>
+    </div>
+
+    <div class="group">
+      <strong>Shape Color</strong>
+
+      <div class="line">
+        <label for="redSlide">Red</label>
+        <input id="redSlide" type="range" min="0" max="100" value="100">
+      </div>
+
+      <div class="line">
+        <label for="greenSlide">Green</label>
+        <input id="greenSlide" type="range" min="0" max="100" value="30">
+      </div>
+
+      <div class="line">
+        <label for="blueSlide">Blue</label>
+        <input id="blueSlide" type="range" min="0" max="100" value="80">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="line">
+        <label for="sizeSlide">Shape Size</label>
+        <input id="sizeSlide" type="range" min="5" max="40" value="12">
+      </div>
+
+      <div class="line">
+        <label for="segSlide">Circle Segments</label>
+        <input id="segSlide" type="range" min="3" max="40" value="14">
+      </div>
+    </div>
+
+  </div>
+
+  <script src="asg1.js"></script>
+</body>
+</html>
