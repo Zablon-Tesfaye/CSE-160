@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ASG2 Fox - 3D Fox</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #eeeeee;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    canvas {
+      border: 2px solid #333;
+      background: #a9d5ff;
+      display: block;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    .panel {
+      background: white;
+      padding: 15px 20px;
+      margin-top: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .control-group {
+      display: inline-block;
+      margin-right: 30px;
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: inline-block;
+      width: 80px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 200px;
+      cursor: pointer;
+      vertical-align: middle;
+    }
+
+    button {
+      margin: 5px 8px;
+      padding: 6px 18px;
+      cursor: pointer;
+      background: #ff7b2c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #e05a00;
+    }
+
+    #animationOff {
+      background: #555;
+    }
+
+    #resetBtn {
+      background: #3a6ea5;
+    }
+
+    h1 {
+      color: #d35400;
+      margin-top: 0;
+    }
+
+    .info {
+      color: #666;
+      font-size: 13px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+    }
+  </style>
+</head>
+
+<body onload="main()">
+  <div class="container">
+    <h1>🦊 Assignment 2: 3D Fox</h1>
+
+    <canvas id="webgl" width="800" height="600"></canvas>
+
+    <div class="panel">
+      <div>
+        <div class="control-group">
+          <label>Turn Fox</label>
+          <input id="angleSlide" type="range" min="-180" max="180" value="180" step="1">
+        </div>
+
+        <div class="control-group">
+          <label>Leg Swing</label>
+          <input id="legSlide" type="range" min="-30" max="30" value="0" step="1">
+        </div>
+
+        <div class="control-group">
+          <label>Head Turn</label>
+          <input id="headSlide" type="range" min="-25" max="25" value="0" step="1">
+        </div>
+
+        <div class="control-group">
+          <label>Tail Wag</label>
+          <input id="tailSlide" type="range" min="-45" max="45" value="0" step="1">
+        </div>
+      </div>
+      
+      <div style="margin: 15px 0 5px 0;">
+        <button id="animationOn">▶ Animation On</button>
+        <button id="animationOff">▪ Animation Off</button>
+        <button id="resetBtn">⟳ Reset</button>
+      </div>
+
+      <div class="info">
+        💡 <strong>Tips:</strong> Drag sliders to pose the fox. Click "Animation On" for walking movement.
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/webgl-utils.js"></script>
+  <script src="lib/webgl-debug.js"></script>
+  <script src="lib/cuon-utils.js"></script>
+  <script src="lib/cuon-matrix-cse160.js"></script>
+  <script src="asg2.js"></script>
+</body>
+</html>
