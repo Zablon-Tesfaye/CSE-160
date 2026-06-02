@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>ASG5 - Three.js World</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; font-family: Arial, sans-serif; }
+    canvas { display: block; }
+
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 13px;
+      background: rgba(0,0,0,0.5);
+      padding: 8px 12px;
+      border-radius: 6px;
+      line-height: 1.7;
+      pointer-events: none;
+    }
+
+    #credit {
+      position: absolute;
+      bottom: 8px;
+      right: 10px;
+      color: rgba(255,255,255,0.4);
+      font-size: 11px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="info">
+  🌍 ASG5 — Three.js World<br>
+  Mouse drag: orbit &nbsp;|&nbsp; Scroll: zoom &nbsp;|&nbsp; Right drag: pan
+</div>
+
+<div id="credit">Duck model from poly.pizza (CC0)</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+
+// ── Renderer ────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ── Scene ────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+
+// ── Camera ───────────────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 8, 22);
+camera.lookAt(0, 0, 0);
+
+// ── OrbitControls ─────────────────────────────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.maxPolarAngle = Math.PI / 2;
+
+// ═════════════════════════════════════════════════════════════
+//  SKYBOX (textured cubemap)
+//  Using a solid color sky + THREE.Sky addon fallback via
+//  a simple gradient background texture approach that works
+//  without a server — uses a canvas-generated cubemap
+// ═════════════════════════════════════════════════════════════
+function makeSkyCubemap() {
+  const size = 512;
+  const dirs = [
+    { top: '#1a6faf', bot: '#87ceeb' }, // px
+    { top: '#1a6faf', bot: '#87ceeb' }, // nx
+    { top: '#0d3d6e', bot: '#1a6faf' }, // py (top)
+    { top: '#4a9fd4', bot: '#87ceeb' }, // ny (bottom)
+    { top: '#1a6faf', bot: '#87ceeb' }, // pz
+    { top: '#1a6faf', bot: '#87ceeb' }, // nz
+  ];
+
+  const canvases = dirs.map(d => {
+    const c   = document.createElement('canvas');
+    c.width   = size;
+    c.height  = size;
+    const ctx = c.getContext('2d');
+    const g   = ctx.createLinearGradient(0, 0, 0, size);
+    g.addColorStop(0,   d.top);
+    g.addColorStop(1,   d.bot);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+
+    // Add a few white cloud blobs to most faces
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    for (let i = 0; i < 6; i++) {
+      const cx = Math.random() * size;
+      const cy = Math.random() * size * 0.5;
+      const rx = 30 + Math.random() * 60;
+      const ry = 15 + Math.random() * 25;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return c;
+  });
+
+  return new THREE.CubeTexture(canvases);
+}
+
+const skybox = makeSkyCubemap();
+skybox.needsUpdate = true;
+scene.background = skybox;
+
+
+// ═════════════════════════════════════════════════════════════
+//  LIGHTS — 3 different types required
+// ═════════════════════════════════════════════════════════════
+
+// 1. Ambient light — soft fill so nothing is pitch black
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+// 2. Directional light — acts like the sun, casts shadows
+const dirLight = new THREE.DirectionalLight(0xfff5cc, 1.2);
+dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far  = 100;
+dirLight.shadow.camera.left = -30;
+dirLight.shadow.camera.right = 30;
+dirLight.shadow.camera.top   = 30;
+dirLight.shadow.camera.bottom = -30;
+scene.add(dirLight);
+
+// 3. PointLight — orbiting sun light
+// High intensity + large distance so it brightly lights the whole scene
+// decay=1 gives softer falloff than physically correct decay=2
+const pointLight = new THREE.PointLight(0xfff4cc, 8.0, 60, 1);
+pointLight.position.set(0, 6, 0);
+pointLight.castShadow = true;
+pointLight.shadow.mapSize.set(2048, 2048);
+pointLight.shadow.camera.near = 0.5;
+pointLight.shadow.camera.far  = 65;
+scene.add(pointLight);
+
+// 4. SpotLight — highlights the duck model when it loads
+const spotLight = new THREE.SpotLight(0x88aaff, 3, 25, Math.PI / 8, 0.3, 1);
+spotLight.position.set(-5, 10, 5);
+spotLight.castShadow = true;
+scene.add(spotLight);
+
+// Small glowing sphere to show where the point light is
+const lightBallGeo = new THREE.SphereGeometry(0.25, 8, 8);
+const lightBallMat = new THREE.MeshBasicMaterial({ color: 0xff8844 });
+const lightBall    = new THREE.Mesh(lightBallGeo, lightBallMat);
+scene.add(lightBall);
+
+
+// ═════════════════════════════════════════════════════════════
+//  TEXTURES — generated procedurally on canvas so no server needed
+// ═════════════════════════════════════════════════════════════
+function makeTexture(drawFn, size = 256) {
+  const c   = document.createElement('canvas');
+  c.width   = size;
+  c.height  = size;
+  drawFn(c.getContext('2d'), size);
+  const t       = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+// Grass texture — tiled pattern with varied green shades
+const grassTex = makeTexture((ctx, s) => {
+  // Base green
+  ctx.fillStyle = '#3d8b3d';
+  ctx.fillRect(0, 0, s, s);
+
+  // Darker patch variation
+  for (let i = 0; i < 30; i++) {
+    const x = Math.random() * s, y = Math.random() * s;
+    const r = 10 + Math.random() * 25;
+    const g = 80 + Math.floor(Math.random() * 60);
+    ctx.fillStyle = `rgba(10,${g},10,0.4)`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Grass blade strokes
+  for (let i = 0; i < 800; i++) {
+    const x = Math.random() * s;
+    const y = Math.random() * s;
+    const g = 90 + Math.floor(Math.random() * 100);
+    ctx.strokeStyle = `rgb(15,${g},15)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + (Math.random()-0.5)*4, y - 4 - Math.random()*6);
+    ctx.stroke();
+  }
+
+  // Subtle grid lines so tiling is visible
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < s; i += 32) {
+    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,s); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(s,i); ctx.stroke();
+  }
+}, 512);
+grassTex.repeat.set(12, 12);
+
+// Brick texture for walls and cubes
+const brickTex = makeTexture((ctx, s) => {
+  ctx.fillStyle = '#b0a898';
+  ctx.fillRect(0, 0, s, s);
+  const bw = s/4, bh = s/8;
+  for (let row = 0; row < 8; row++) {
+    const off = (row % 2) * bw / 2;
+    for (let col = -1; col < 5; col++) {
+      const shade = 130 + Math.floor(Math.random() * 50);
+      ctx.fillStyle = `rgb(${shade},${Math.floor(shade*0.45)},${Math.floor(shade*0.35)})`;
+      ctx.fillRect(col*bw + off + 2, row*bh + 2, bw - 4, bh - 4);
+    }
+  }
+});
+
+// Wood texture for cylinders
+const woodTex = makeTexture((ctx, s) => {
+  ctx.fillStyle = '#8B6340';
+  ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < s; i += 4) {
+    const v = 80 + Math.floor(Math.random() * 60);
+    ctx.strokeStyle = `rgb(${v},${Math.floor(v*0.65)},${Math.floor(v*0.35)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(s, i + Math.random() * 8 - 4);
+    ctx.stroke();
+  }
+});
+
+// Marble texture for spheres
+const marbleTex = makeTexture((ctx, s) => {
+  ctx.fillStyle = '#e8e0d0';
+  ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < 20; i++) {
+    ctx.strokeStyle = `rgba(100,80,60,${Math.random() * 0.3})`;
+    ctx.lineWidth = Math.random() * 3 + 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.random() * s, 0);
+    for (let j = 0; j < 10; j++) {
+      ctx.lineTo(Math.random() * s, j * s / 10);
+    }
+    ctx.stroke();
+  }
+});
+
+
+// ═════════════════════════════════════════════════════════════
+//  GROUND PLANE
+// ═════════════════════════════════════════════════════════════
+const groundGeo = new THREE.PlaneGeometry(80, 80);
+const groundMat = new THREE.MeshPhongMaterial({ map: grassTex, shininess: 5 });
+const ground    = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+
+// ═════════════════════════════════════════════════════════════
+//  HELPER — creates a mesh and adds to scene
+// ═════════════════════════════════════════════════════════════
+function addMesh(geo, mat, x, y, z, castShadow = true) {
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow  = castShadow;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+
+
+// ═════════════════════════════════════════════════════════════
+//  20+ PRIMARY SHAPES
+//  Using cubes, spheres, cylinders, cones, torus, dodecahedron
+// ═════════════════════════════════════════════════════════════
+
+const brickMat  = new THREE.MeshPhongMaterial({ map: brickTex, shininess: 20 });
+const woodMat   = new THREE.MeshPhongMaterial({ map: woodTex,  shininess: 10 });
+const marbleMat = new THREE.MeshPhongMaterial({ map: marbleTex, shininess: 120, specular: 0x888888 });
+const redMat    = new THREE.MeshPhongMaterial({ color: 0xdd3333, shininess: 80,  specular: 0x441111 });
+const blueMat   = new THREE.MeshPhongMaterial({ color: 0x3366cc, shininess: 100, specular: 0x112244 });
+const goldMat   = new THREE.MeshPhongMaterial({ color: 0xffd700, shininess: 150, specular: 0xaaaa00 });
+const greenMat  = new THREE.MeshPhongMaterial({ color: 0x228822, shininess: 20 });
+const orangeMat = new THREE.MeshPhongMaterial({ color: 0xff7722, shininess: 60,  specular: 0x441100 });
+const purpleMat = new THREE.MeshPhongMaterial({ color: 0x9933cc, shininess: 100, specular: 0x330044 });
+const tealMat   = new THREE.MeshPhongMaterial({ color: 0x009988, shininess: 80,  specular: 0x003333 });
+const whiteMat  = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 60,  specular: 0x444444 });
+
+// ── Cubes (BoxGeometry) ──────────────────────────────────────
+// Building row
+const cube1  = addMesh(new THREE.BoxGeometry(2,2,2),   brickMat,  -8, 1,  -6);
+const cube2  = addMesh(new THREE.BoxGeometry(2,3,2),   brickMat,  -5, 1.5,-6);
+const cube3  = addMesh(new THREE.BoxGeometry(2,4,2),   brickMat,  -2, 2,  -6);
+const cube4  = addMesh(new THREE.BoxGeometry(1.5,1.5,1.5), blueMat, 3, 0.75, -4);
+const cube5  = addMesh(new THREE.BoxGeometry(1,1,1),   goldMat,   6, 0.5,  2);
+const cube6  = addMesh(new THREE.BoxGeometry(3,0.5,3), brickMat,  0, 0.25, 4); // platform
+
+// ── Spheres ──────────────────────────────────────────────────
+const sph1   = addMesh(new THREE.SphereGeometry(1,   32, 32), marbleMat, -6, 1,    2);
+const sph2   = addMesh(new THREE.SphereGeometry(0.7, 32, 32), redMat,     4, 0.7,  6);
+const sph3   = addMesh(new THREE.SphereGeometry(1.2, 32, 32), blueMat,   -3, 1.2, -2);
+const sph4   = addMesh(new THREE.SphereGeometry(0.5, 16, 16), goldMat,    7, 0.5, -2);
+const sph5   = addMesh(new THREE.SphereGeometry(0.4, 16, 16), purpleMat,  5, 4,    0); // floating
+
+// ── Cylinders ────────────────────────────────────────────────
+const cyl1   = addMesh(new THREE.CylinderGeometry(0.3, 0.3, 4, 12), woodMat,  -9, 2,  4);
+const cyl2   = addMesh(new THREE.CylinderGeometry(0.3, 0.3, 4, 12), woodMat,  -9, 2, -2);
+const cyl3   = addMesh(new THREE.CylinderGeometry(0.5, 0.8, 2, 16), tealMat,   2, 1,  0);
+const cyl4   = addMesh(new THREE.CylinderGeometry(0.2, 0.2, 3, 8),  woodMat,   9, 1.5, 3);
+
+// ── Cones ────────────────────────────────────────────────────
+const cone1  = addMesh(new THREE.ConeGeometry(1, 2, 16), redMat,    -8, 5.5, 4);  // roof on lamp post
+const cone2  = addMesh(new THREE.ConeGeometry(0.8,1.5,16), greenMat, -5, 4,  -6); // pointed roof
+const cone3  = addMesh(new THREE.ConeGeometry(0.4, 1, 8),  orangeMat, 9, 4, 3);
+
+// ── Torus ────────────────────────────────────────────────────
+const tor1   = addMesh(new THREE.TorusGeometry(1.5, 0.3, 16, 60), goldMat,    0, 3,  0);
+const tor2   = addMesh(new THREE.TorusGeometry(0.8, 0.2, 12, 40), purpleMat,  6, 1,  -6);
+
+// ── Dodecahedron & Octahedron ────────────────────────────────
+const dodec  = addMesh(new THREE.DodecahedronGeometry(0.8), marbleMat, -1, 0.8, 6);
+const octa   = addMesh(new THREE.OctahedronGeometry(0.6),    goldMat,   3, 2.6,  4); // sits on platform
+
+// ── Roof cap on cube3 ────────────────────────────────────────
+addMesh(new THREE.ConeGeometry(1.5, 1.5, 4), redMat, -2, 5.75, -6);
+
+// Add roof cap to cube1 and cube2 as well
+addMesh(new THREE.ConeGeometry(1.5, 1.5, 4), redMat, -8, 3.5, -6);
+addMesh(new THREE.ConeGeometry(1.5, 1.5, 4), redMat, -5, 4.25,-6);
+
+// Count is well over 20 now
+
+
+// ═════════════════════════════════════════════════════════════
+//  LAMP POST  (visual marker for the point light)
+// ═════════════════════════════════════════════════════════════
+const postGeo = new THREE.CylinderGeometry(0.08, 0.08, 5, 8);
+const postMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
+const post    = addMesh(postGeo, postMat, 0, 2.5, 0);
+
+const lampGeo = new THREE.SphereGeometry(0.25, 8, 8);
+const lampMat = new THREE.MeshBasicMaterial({ color: 0xffee88 });
+const lamp    = new THREE.Mesh(lampGeo, lampMat);
+lamp.position.set(0, 5.2, 0);
+scene.add(lamp);
+
+
+// ═════════════════════════════════════════════════════════════
+//  FENCE around the scene
+// ═════════════════════════════════════════════════════════════
+const fencePostGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 6);
+const fencePostMat = new THREE.MeshPhongMaterial({ color: 0x8B6340 });
+const railGeo      = new THREE.CylinderGeometry(0.04, 0.04, 2.1, 6);
+railGeo.rotateZ(Math.PI / 2);
+
+for (let i = -9; i <= 9; i += 2) {
+  // Front fence
+  addMesh(fencePostGeo, fencePostMat, i, 0.6, 9);
+  addMesh(railGeo,      fencePostMat, i + 1, 0.9, 9);
+  // Back fence
+  addMesh(fencePostGeo, fencePostMat, i, 0.6, -9);
+  addMesh(railGeo,      fencePostMat, i + 1, 0.9, -9);
+}
+
+
+// ═════════════════════════════════════════════════════════════
+//  LOAD TEXTURED 3D MODEL (.glb)
+//  Loading duck.glb locally from the asgn5 folder
+//  Downloaded from poly.pizza (CC0 license)
+// ═════════════════════════════════════════════════════════════
+const gltfLoader = new GLTFLoader();
+
+gltfLoader.load(
+  './duck.glb',
+  (gltf) => {
+    const duck = gltf.scene;
+
+    // Auto-scale the duck to a visible size using its bounding box
+    const box    = new THREE.Box3().setFromObject(duck);
+    const size   = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scaleF = 4.2 / maxDim;
+    duck.scale.setScalar(scaleF);
+
+    // Re-center at ground level after scaling
+    const box2   = new THREE.Box3().setFromObject(duck);
+    duck.position.x = -3 - box2.getCenter(new THREE.Vector3()).x;
+    duck.position.y = -box2.min.y;
+    duck.position.z = 5 - box2.getCenter(new THREE.Vector3()).z;
+
+    duck.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow    = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    scene.add(duck);
+    spotLight.target = duck;
+    console.log('Duck loaded successfully!');
+  },
+  (xhr) => {
+    console.log('Duck: ' + Math.round(xhr.loaded / xhr.total * 100) + '% loaded');
+  },
+  (err) => {
+    console.error('Duck load failed:', err);
+  }
+);
+
+
+// ═════════════════════════════════════════════════════════════
+//  WOW POINT — Day / Night cycle
+//  The ambient and directional light colors slowly shift
+//  from warm daylight to cool night and back over time.
+//  The skybox background color lerps between day and night too.
+// ═════════════════════════════════════════════════════════════
+const dayAmbient   = new THREE.Color(0xffffff);
+const nightAmbient = new THREE.Color(0x111133);
+const dayDir       = new THREE.Color(0xfff5cc);
+const nightDir     = new THREE.Color(0x222255);
+
+let dayNightTime = 0; // 0 = full day, 1 = full night
+
+
+// ═════════════════════════════════════════════════════════════
+//  ANIMATION LOOP
+// ═════════════════════════════════════════════════════════════
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  const delta = clock.getDelta();
+  elapsed    += delta;
+
+  // Animate the torus — spin continuously
+  tor1.rotation.x = elapsed * 0.8;
+  tor1.rotation.y = elapsed * 0.5;
+  tor2.rotation.z = elapsed * 1.2;
+
+  // Animate spheres — gentle bob up and down
+  sph5.position.y  = 4 + Math.sin(elapsed * 2) * 0.5;
+  sph3.position.y  = 1.2 + Math.sin(elapsed * 1.3 + 1) * 0.3;
+  octa.rotation.y  = elapsed * 1.5;
+  dodec.rotation.y = elapsed * 0.6;
+
+  // Animate the point light orbiting in a circle
+  const lr        = 12.0;
+  const ls        = elapsed * 0.3;
+  pointLight.position.x = Math.cos(ls) * lr;
+  pointLight.position.z = Math.sin(ls) * lr;
+  pointLight.position.y = 5 + Math.sin(elapsed * 0.2) * 0.5;
+  lightBall.position.copy(pointLight.position);
+
+  // Cube5 (golden cube) spins
+  cube5.rotation.y = elapsed * 1.0;
+  cube5.rotation.x = elapsed * 0.5;
+
+  // Day/Night cycle — full cycle every 30 seconds
+  dayNightTime = (Math.sin(elapsed * Math.PI / 40) + 1) / 2; // 0=day, 1=night
+  ambientLight.color.lerpColors(dayAmbient,  nightAmbient, dayNightTime);
+  dirLight.color.lerpColors(dayDir, nightDir, dayNightTime);
+  // Ambient stays at a reasonable minimum so scene never goes pitch black
+  ambientLight.intensity = 0.5 - dayNightTime * 0.35;
+  // Directional sun fades out completely at night
+  dirLight.intensity     = 1.4 - dayNightTime * 1.4;
+  // Orbiting sun — full brightness during day, dims at night
+  pointLight.intensity   = 8.0 - dayNightTime * 5.0;
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+
+// ── Resize handler ───────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+</script>
+</body>
+</html>
